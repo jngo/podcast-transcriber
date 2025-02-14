@@ -33,9 +33,19 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
       return { error: "Could not find the header button items" }
     }
 
-    const bookmarkItem = headerButtonItems.find(
-      (item: any) => item.$kind === "bookmark" && item.modelType === "EpisodeOffer",
-    )
+    const bookmarkItem = headerButtonItems.find((item: unknown) => {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "$kind" in item &&
+        "modelType" in item &&
+        (item as { $kind: unknown }).$kind === "bookmark" &&
+        (item as { modelType: unknown }).modelType === "EpisodeOffer"
+      ) {
+        return true;
+      }
+      return false;
+    });
 
     if (!bookmarkItem) {
       return { error: "Could not find the bookmark item" }

@@ -55,9 +55,7 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
 }
 
 export async function generateTranscript(downloadUrl: string): Promise<TranscriptResponse> {
-  // const deepgramApiKey = process.env.DEEPGRAM_API_KEY
-  const deepgramApiKey = "a6933585e6203b5ece01609872f8b22e79240be6"
-
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY
   console.log("Deepgram API Key:", deepgramApiKey ? "Set" : "Not set")
 
   if (!deepgramApiKey) {
@@ -89,8 +87,7 @@ export async function generateTranscript(downloadUrl: string): Promise<Transcrip
       throw new Error(error.message)
     }
 
-    // if (!result?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
-      if (!result?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.transcript) {
+    if (!result?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.transcript) {
       throw new Error("No transcript generated")
     }
 

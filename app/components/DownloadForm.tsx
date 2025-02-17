@@ -37,6 +37,9 @@ export default function DownloadForm() {
   async function handleExtractWisdom() {
     setIsLoading(true)
     try {
+      if (!transcriptResult?.transcript) {
+        throw new Error("No transcript available")
+      }
       const extractedWisdom = await extractWisdom(transcriptResult.transcript)
       setWisdom(extractedWisdom)
     } catch (error) {

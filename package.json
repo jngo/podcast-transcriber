@@ -9,17 +9,22 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.1.12",
     "@deepgram/sdk": "^3.10.1",
     "@radix-ui/react-slot": "^1.1.2",
+    "ai": "^4.1.41",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "next": "14.2.16",
+    "openai": "^4.85.1",
     "react": "^18",
     "react-dom": "^18",
+    "react-markdown": "^9.0.3",
     "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^20",

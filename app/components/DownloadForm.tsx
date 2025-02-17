@@ -1,15 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { getDownloadUrl, generateTranscript } from "../actions"
+import { getDownloadUrl, generateTranscript, extractWisdom } from "../actions"
 import type { DownloadUrlResponse, TranscriptResponse } from "../types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import ReactMarkdown from "react-markdown"
 
 export default function DownloadForm() {
   const [result, setResult] = useState<DownloadUrlResponse | null>(null)
   const [transcriptResult, setTranscriptResult] = useState<TranscriptResponse | null>(null)
+  const [wisdom, setWisdom] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
 
@@ -29,6 +31,19 @@ export default function DownloadForm() {
       const res = await generateTranscript(result.downloadUrl)
       setTranscriptResult(res)
       setIsTranscribing(false)
+    }
+  }
+
+  async function handleExtractWisdom() {
+    setIsLoading(true)
+    try {
+      const extractedWisdom = await extractWisdom(transcriptResult.transcript)
+      setWisdom(extractedWisdom)
+    } catch (error) {
+      console.error("Error extracting wisdom:", error)
+      setWisdom("An error occurred while extracting wisdom. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -79,17 +94,32 @@ export default function DownloadForm() {
             {transcriptResult.error ? (
               <p className="text-red-600">{transcriptResult.error}</p>
             ) : (
-              <div>
-                <h2 className="text-lg font-semibold mb-2">Transcript:</h2>
-                <div className="overflow-y-auto">
-                  <p className="whitespace-pre-wrap">{transcriptResult.transcript}</p>
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold mb-2">Transcript:</h2>
+                  <div className="overflow-y-auto">
+                    <p className="whitespace-pre-wrap">{transcriptResult.transcript}</p>
+                  </div>
                 </div>
+                <Button onClick={handleExtractWisdom} disabled={isLoading || !transcriptResult.transcript} variant="secondary" className="w-full">
+                  {isLoading ? "Extracting Wisdom..." : "Extract Wisdom"}
+                </Button>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {wisdom && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="mt-4">
+              <h3 className="text-lg font-semibold mb-2">Extracted Wisdom:</h3>
+              <ReactMarkdown className="markdown-content">{wisdom}</ReactMarkdown>
+            </div>
           </CardContent>
         </Card>
       )}
     </div>
   )
 }
-

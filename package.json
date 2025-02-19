@@ -12,6 +12,7 @@
     "@ai-sdk/openai": "^1.1.12",
     "@deepgram/sdk": "^3.10.1",
     "@radix-ui/react-slot": "^1.1.2",
+    "@vercel/analytics": "^1.5.0",
     "ai": "^4.1.41",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",

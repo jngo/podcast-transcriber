@@ -188,3 +188,50 @@ export async function extractWisdom(transcript: string) {
 
   return text
 }
+
+export async function getEpisodeMetadata(url: string) {
+  function formatDuration(isoDuration: string) {
+    const matches = isoDuration.match(/P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/);
+    if (!matches) return isoDuration;
+
+    const [, hours, minutes, seconds] = matches;
+    const parts = [];
+
+    if (hours) parts.push(`${hours} ${parseInt(hours) === 1 ? 'hour' : 'hours'}`);
+    if (minutes) parts.push(`${minutes} ${parseInt(minutes) === 1 ? 'minute' : 'minutes'}`);
+    if (seconds) parts.push(`${seconds} ${parseInt(seconds) === 1 ? 'second' : 'seconds'}`);
+
+    return parts.join(' ');
+  }
+
+  try {
+    const response = await fetch(url)
+    const html = await response.text()
+
+    const $ = load(html)
+    const scriptContent = $("#schema\\:episode").html()
+
+    if (!scriptContent) {
+      return { error: "Could not find episode metadata in the page" }
+    }
+
+    const fullMetadata = JSON.parse(scriptContent)
+
+    return {
+      productionCompany: fullMetadata.productionCompany,
+      datePublished: fullMetadata.datePublished,
+      description: fullMetadata.description,
+      duration: formatDuration(fullMetadata.duration),
+      name: fullMetadata.name,
+      url: fullMetadata.url,
+      partOfSeries: {
+        name: fullMetadata.partOfSeries?.name,
+        url: fullMetadata.partOfSeries?.url,
+      },
+      thumbnailUrl: fullMetadata.thumbnailUrl,
+    }
+  } catch (error) {
+    console.error("Error fetching metadata:", error)
+    return { error: "An error occurred while fetching episode metadata" }
+  }
+}

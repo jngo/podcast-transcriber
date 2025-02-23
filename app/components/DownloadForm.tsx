@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { getDownloadUrl, generateTranscript, extractWisdom } from "../actions"
-import type { DownloadUrlResponse, TranscriptResponse } from "../types"
+import { getDownloadUrl, generateTranscript, extractWisdom, getEpisodeMetadata } from "../actions"
+import type { DownloadUrlResponse, EpisodeMetadata, TranscriptResponse } from "../types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,14 +14,30 @@ export default function DownloadForm() {
   const [wisdom, setWisdom] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [metadata, setMetadata] = useState<EpisodeMetadata | null>(null)
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(url: string) {
     setIsLoading(true)
     setResult(null)
     setTranscriptResult(null)
+    setMetadata(null)
+    const formData = new FormData()
+    formData.append('url', url)
     const res = await getDownloadUrl(formData)
     setResult(res)
+    if (!res.error) {
+      const meta = await getEpisodeMetadata(url)
+      console.log('Fetched metadata:', meta)
+      setMetadata(meta)
+    }
     setIsLoading(false)
+  }
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value
+    if (url && url.startsWith('https://podcasts.apple.com/')) {
+      handleSubmit(url)
+    }
   }
 
   async function handleTranscribe() {
@@ -52,17 +68,14 @@ export default function DownloadForm() {
 
   return (
     <div className="space-y-6">
-      <form action={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
         <div>
           <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
             Apple Podcasts Episode URL
           </label>
-          <Input type="url" id="url" name="url" required placeholder="https://podcasts.apple.com/..." />
+          <Input type="url" id="url" name="url" required placeholder="https://podcasts.apple.com/..." onChange={handleUrlChange} disabled={isLoading} />
         </div>
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Processing..." : "Get Download URL"}
-        </Button>
-      </form>
+      </div>
 
       {result && (
         <Card>
@@ -71,17 +84,28 @@ export default function DownloadForm() {
               <p className="text-red-600">{result.error}</p>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <p className="text-green-600 mb-2">Download URL found:</p>
-                  <a
-                    href={result.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline break-all"
-                  >
-                    {result.downloadUrl}
-                  </a>
-                </div>
+                {metadata && (
+                  <div className="space-y-2">
+                    {metadata.thumbnailUrl && (
+                      <img src={metadata.thumbnailUrl} alt="Episode thumbnail" className="w-32 h-32 object-cover rounded" />
+                    )}
+                    <ul className="text-sm text-gray-600 flex items-center gap-6">
+                      {metadata.datePublished && (
+                        <li>{new Date(metadata.datePublished).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</li>
+                      )}
+                      {metadata.duration && (
+                        <li>{metadata.duration}</li>
+                      )}
+                    </ul>
+                    <h2 className="text-lg font-semibold"><a href={metadata.url}>{metadata.name}</a></h2>
+                    {metadata.partOfSeries?.name && (
+                        <a href={metadata.partOfSeries.url}>{metadata.partOfSeries.name}</a>
+                      )}
+                    {metadata.description && (
+                      <p className="text-sm">{metadata.description}</p>
+                    )}
+                  </div>
+                )}
                 <Button onClick={handleTranscribe} disabled={isTranscribing} variant="secondary" className="w-full">
                   {isTranscribing ? "Generating Transcript..." : "Generate Transcript"}
                 </Button>

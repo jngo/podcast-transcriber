@@ -66,7 +66,7 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
   }
 }
 
-export async function generateTranscript(downloadUrl: string): Promise<TranscriptResponse> {
+export async function getTranscript(downloadUrl: string): Promise<TranscriptResponse> {
   const deepgramApiKey = process.env.DEEPGRAM_API_KEY
   console.log("Deepgram API Key:", deepgramApiKey ? "Set" : "Not set")
 
@@ -88,7 +88,6 @@ export async function generateTranscript(downloadUrl: string): Promise<Transcrip
         punctuate: true,
         paragraphs: true,
         utterances: true,
-        diarize: true,
         filler_words: true,
       },
     )
@@ -103,7 +102,7 @@ export async function generateTranscript(downloadUrl: string): Promise<Transcrip
       throw new Error("No transcript generated")
     }
 
-    const transcript = result.results.channels[0].alternatives[0].paragraphs.transcript
+    const transcript = result.results.channels[0].alternatives[0].paragraphs.transcript.split('\n').filter(Boolean)
 
     return { transcript }
   } catch (error) {
@@ -114,7 +113,7 @@ export async function generateTranscript(downloadUrl: string): Promise<Transcrip
   }
 }
 
-export async function extractWisdom(transcript: string) {
+export async function getSummary(transcript: string) {
   const system = `
   # IDENTITY and PURPOSE
 

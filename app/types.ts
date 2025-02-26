@@ -4,7 +4,7 @@ export interface DownloadUrlResponse {
 }
 
 export interface TranscriptResponse {
-  transcript?: string
+  transcript?: string[]
   error?: string
 }
 

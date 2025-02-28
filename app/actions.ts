@@ -4,7 +4,7 @@ import { load } from "cheerio"
 import { createClient } from "@deepgram/sdk"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import type { DownloadUrlResponse, TranscriptResponse } from "./types"
+import type { DownloadUrlResponse, TranscriptResponse, ReadwiseResponse, EpisodeMetadata } from "./types"
 
 console.log("DEEPGRAM_API_KEY is set:", !!process.env.DEEPGRAM_API_KEY)
 
@@ -232,5 +232,39 @@ export async function getEpisodeMetadata(url: string) {
   } catch (error) {
     console.error("Error fetching metadata:", error)
     return { error: "An error occurred while fetching episode metadata" }
+  }
+}
+
+export async function saveToReadwise(accessToken: string, metadata: EpisodeMetadata, transcript: string[]): Promise<ReadwiseResponse> {
+  if (!accessToken) {
+    return { error: "Please provide a Readwise access token" }
+  }
+
+  try {
+    const response = await fetch("https://readwise.io/api/v3/save/", {
+      method: "POST",
+      headers: {
+        "Authorization": `Token ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: metadata.name,
+        author: metadata.partOfSeries?.name,
+        url: metadata.url,
+        html: transcript.map(line => `<p>${line}</p>`).join(''),
+        image_url: metadata.thumbnailUrl,
+        published_date: metadata.datePublished,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    await response.json()
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving to Readwise:", error)
+    return { error: "Failed to save to Readwise. Please check your access token and try again." }
   }
 }

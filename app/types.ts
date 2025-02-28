@@ -23,3 +23,8 @@ export interface EpisodeMetadata {
   error?: string
 }
 
+export interface ReadwiseResponse {
+  success?: boolean
+  error?: string
+}
+

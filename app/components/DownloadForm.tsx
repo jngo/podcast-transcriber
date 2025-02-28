@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { getDownloadUrl, getTranscript, getEpisodeMetadata } from "../actions"
+import { getDownloadUrl, getTranscript, getEpisodeMetadata, saveToReadwise } from "../actions"
 import type { DownloadUrlResponse, EpisodeMetadata, TranscriptResponse } from "../types"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DownloadForm() {
   const [metadata, setMetadata] = useState<EpisodeMetadata | null>(null)
@@ -14,6 +16,11 @@ export default function DownloadForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [url, setUrl] = useState("")
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [accessToken, setAccessToken] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const { toast } = useToast()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,31 +61,68 @@ export default function DownloadForm() {
     setUrl(e.target.value)
   }
 
+  const handleSaveToReader = async () => {
+    if (!metadata || !transcriptResult?.transcript) return
+    
+    setIsSaving(true)
+    setSaveError(null)
+    
+    try {
+      const response = await saveToReadwise(accessToken, metadata, transcriptResult.transcript)
+      
+      if (response.error) {
+        setSaveError(response.error)
+        toast({
+          variant: "destructive",
+          title: "Error saving to Readwise",
+          description: response.error,
+        })
+      } else {
+        setShowTokenDialog(false)
+        setAccessToken("")
+        toast({
+          title: "Success!",
+          description: "The transcript has been saved to your Readwise library.",
+        })
+      }
+    } catch {
+      setSaveError("An unexpected error occurred")
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred while saving to Readwise.",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
-    <Card>
-      {!metadata ? (
-        <>
-          <CardHeader>
-            <CardTitle>Podcast Episode Transcriber</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="flex w-full items-center space-x-2">
-              <Input
-                type="url"
-                id="url"
-                name="url"
-                required
-                placeholder="https://podcasts.apple.com/..."
-                onChange={handleUrlChange}
-                value={url}
-                disabled={isLoading}
-              />
-              <Button type="submit" disabled={isLoading}>Transcribe</Button>
-            </form>
-          </CardContent>
-        </>
-      ) : (
-        <>
+    <>
+      <Card>
+        {!metadata ? (
+          <>
+            <CardHeader>
+              <CardTitle>Podcast Episode Transcriber</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="flex w-full items-center space-x-2">
+                <Input
+                  type="url"
+                  id="url"
+                  name="url"
+                  required
+                  placeholder="https://podcasts.apple.com/..."
+                  onChange={handleUrlChange}
+                  value={url}
+                  disabled={isLoading}
+                />
+                <Button type="submit" disabled={isLoading}>Transcribe</Button>
+              </form>
+            </CardContent>
+          </>
+        ) : (
+          <>
             {result?.error ? (
               <p className="text-red-600">{result.error}</p>
             ) : (
@@ -126,10 +170,52 @@ export default function DownloadForm() {
                     ))
                   )}
                 </CardContent>
+
+                {transcriptResult?.transcript && (
+                  <CardFooter>
+                    <Button 
+                      onClick={() => setShowTokenDialog(true)}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Saving to Reader..." : "Save to Reader"}
+                    </Button>
+                  </CardFooter>
+                )}
               </>
             )}
-        </>
-      )}
-    </Card>
+          </>
+        )}
+      </Card>
+
+      <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save to Readwise</DialogTitle>
+            <DialogDescription>
+              Please enter your Readwise access token to save this transcript.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              type="password"
+              placeholder="Enter your Readwise access token"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+            />
+            {saveError && (
+              <p className="text-sm text-red-600">{saveError}</p>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowTokenDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveToReader} disabled={!accessToken || isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

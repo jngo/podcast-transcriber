@@ -261,8 +261,11 @@ export async function saveToReadwise(accessToken: string, metadata: EpisodeMetad
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    await response.json()
-    return { success: true }
+    const data = await response.json()
+    return { 
+      success: true,
+      documentUrl: data.url
+    }
   } catch (error) {
     console.error("Error saving to Readwise:", error)
     return { error: "Failed to save to Readwise. Please check your access token and try again." }

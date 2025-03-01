@@ -26,5 +26,6 @@ export interface EpisodeMetadata {
 export interface ReadwiseResponse {
   success?: boolean
   error?: string
+  documentUrl?: string
 }
 

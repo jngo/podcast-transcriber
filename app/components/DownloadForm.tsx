@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { getDownloadUrl, getTranscript, getEpisodeMetadata, saveToReadwise } from "../actions"
 import type { DownloadUrlResponse, EpisodeMetadata, TranscriptResponse } from "../types"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { ExternalLink } from "lucide-react"
 
 export default function DownloadForm() {
   const [metadata, setMetadata] = useState<EpisodeMetadata | null>(null)
@@ -20,7 +23,18 @@ export default function DownloadForm() {
   const [accessToken, setAccessToken] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [shouldSaveToken, setShouldSaveToken] = useState(false)
   const { toast } = useToast()
+
+  const READWISE_TOKEN_KEY = "readwise_access_token"
+
+  useEffect(() => {
+    // Check for token in local storage on component mount
+    const savedToken = localStorage.getItem(READWISE_TOKEN_KEY)
+    if (savedToken) {
+      setAccessToken(savedToken)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -71,6 +85,12 @@ export default function DownloadForm() {
       const response = await saveToReadwise(accessToken, metadata, transcriptResult.transcript)
       
       if (response.error) {
+        // Clear token from local storage if it's invalid
+        if (response.error.toLowerCase().includes("invalid token") || 
+            response.error.toLowerCase().includes("unauthorized")) {
+          localStorage.removeItem(READWISE_TOKEN_KEY)
+          setAccessToken("")
+        }
         setSaveError(response.error)
         toast({
           variant: "destructive",
@@ -78,11 +98,28 @@ export default function DownloadForm() {
           description: response.error,
         })
       } else {
+        // Only save token to local storage if the user opted in
+        if (shouldSaveToken) {
+          localStorage.setItem(READWISE_TOKEN_KEY, accessToken)
+        }
         setShowTokenDialog(false)
-        setAccessToken("")
         toast({
           title: "Success!",
-          description: "The transcript has been saved to your Readwise library.",
+          description: (
+            <div className="flex items-center gap-2">
+              <span>The transcript has been saved to your Readwise library.</span>
+              {response.documentUrl && (
+                <a
+                  href={response.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  View <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+          ),
         })
       }
     } catch {
@@ -94,6 +131,16 @@ export default function DownloadForm() {
       })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleSaveButtonClick = () => {
+    if (accessToken) {
+      // If we have a token, try using it directly
+      handleSaveToReader()
+    } else {
+      // If no token, show the dialog
+      setShowTokenDialog(true)
     }
   }
 
@@ -174,7 +221,7 @@ export default function DownloadForm() {
                 {transcriptResult?.transcript && (
                   <CardFooter>
                     <Button 
-                      onClick={() => setShowTokenDialog(true)}
+                      onClick={handleSaveButtonClick}
                       disabled={isSaving}
                     >
                       {isSaving ? "Saving to Reader..." : "Save to Reader"}
@@ -191,8 +238,19 @@ export default function DownloadForm() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save to Readwise</DialogTitle>
-            <DialogDescription>
-              Please enter your Readwise access token to save this transcript.
+            <DialogDescription className="space-y-2">
+              <p>Please enter your Readwise access token to save this transcript.</p>
+              <p className="text-sm">
+                You can find your access token in your{" "}
+                <a
+                  href="https://readwise.io/access_token"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Readwise settings <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -202,6 +260,16 @@ export default function DownloadForm() {
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
             />
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="save-token"
+                checked={shouldSaveToken}
+                onCheckedChange={(checked: boolean) => setShouldSaveToken(checked)}
+              />
+              <Label htmlFor="save-token" className="text-sm text-muted-foreground">
+                Remember this token for future use
+              </Label>
+            </div>
             {saveError && (
               <p className="text-sm text-red-600">{saveError}</p>
             )}

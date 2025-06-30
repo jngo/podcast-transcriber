@@ -12,3 +12,4 @@ The application tracks custom events using Vercel Web Analytics. All events foll
 | `transcript_save_error` | Saving transcript to Readwise failed. | `error` – error message. |
 | `token_show_dialog` | Readwise token dialog is shown. | – |
 | `token_store` | User persists the Readwise token in local storage. | – |
+| `transcript_click_link` | User clicks the "View" link in the success toast. | – |

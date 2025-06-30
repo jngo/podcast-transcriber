@@ -134,6 +134,7 @@ export default function DownloadForm() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-primary hover:underline"
+                  onClick={() => track('transcript_click_link')}
                 >
                   View <ExternalLink className="h-4 w-4" />
                 </a>

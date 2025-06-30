@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { track } from "@vercel/analytics"
 import { getDownloadUrl, getTranscript, getEpisodeMetadata, saveToReadwise } from "../actions"
 import type { DownloadUrlResponse, EpisodeMetadata, TranscriptResponse } from "../types"
 import { Input } from "@/components/ui/input"
@@ -39,6 +40,7 @@ export default function DownloadForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (url && url.startsWith('https://podcasts.apple.com/')) {
+      track('episode_transcribe', { url: url })
       setIsLoading(true)
       setResult(null)
       setTranscriptResult(null)
@@ -55,16 +57,30 @@ export default function DownloadForm() {
         ])
 
         setResult(res)
-        if (!res.error && res.downloadUrl) {
+        if (res.error) {
+          track('episode_transcribe_error', { step: 'download_url', error: res.error })
+        }
+        if (meta && 'error' in meta && meta.error) {
+          track('episode_transcribe_error', { step: 'metadata', error: meta.error })
+        } else {
           setMetadata(meta)
+        }
+
+        if (!res.error && res.downloadUrl) {
           // Automatically start transcription
           setIsTranscribing(true)
           const transcriptRes = await getTranscript(res.downloadUrl)
           setTranscriptResult(transcriptRes)
           setIsTranscribing(false)
+          if (transcriptRes.error) {
+            track('episode_transcribe_error', { step: 'transcript', error: transcriptRes.error })
+          } else if (transcriptRes.transcript) {
+            track('episode_transcribe_success', { url: url })
+          }
         }
       } catch (error) {
         console.error("Error during submission:", error)
+        track('episode_transcribe_error', { step: 'api', error: (error as Error).message })
       } finally {
         setIsLoading(false)
       }
@@ -77,13 +93,14 @@ export default function DownloadForm() {
 
   const handleSaveToReader = async () => {
     if (!metadata || !transcriptResult?.transcript) return
-    
+
     setIsSaving(true)
     setSaveError(null)
-    
+    track('transcript_save', { hasToken: Boolean(accessToken) })
+
     try {
       const response = await saveToReadwise(accessToken, metadata, transcriptResult.transcript)
-      
+
       if (response.error) {
         // Clear token from local storage if it's invalid
         if (response.error.toLowerCase().includes("invalid token") || 
@@ -92,6 +109,7 @@ export default function DownloadForm() {
           setAccessToken("")
         }
         setSaveError(response.error)
+        track('transcript_save_error', { error: response.error })
         toast({
           variant: "destructive",
           title: "Error saving to Readwise",
@@ -101,8 +119,10 @@ export default function DownloadForm() {
         // Only save token to local storage if the user opted in
         if (shouldSaveToken) {
           localStorage.setItem(READWISE_TOKEN_KEY, accessToken)
+          track('token_store')
         }
         setShowTokenDialog(false)
+        track('transcript_save_success')
         toast({
           title: "Success!",
           description: (
@@ -114,6 +134,7 @@ export default function DownloadForm() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-primary hover:underline"
+                  onClick={() => track('transcript_click_link')}
                 >
                   View <ExternalLink className="h-4 w-4" />
                 </a>
@@ -122,8 +143,9 @@ export default function DownloadForm() {
           ),
         })
       }
-    } catch {
+    } catch (err) {
       setSaveError("An unexpected error occurred")
+      track('transcript_save_error', { error: (err as Error).message })
       toast({
         variant: "destructive",
         title: "Error",
@@ -140,6 +162,7 @@ export default function DownloadForm() {
       handleSaveToReader()
     } else {
       // If no token, show the dialog
+      track('token_show_dialog')
       setShowTokenDialog(true)
     }
   }

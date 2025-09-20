@@ -55,7 +55,15 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
     }
 
     // Navigate to the stream URL using yt-dlp's path: playAction.episodeOffer.streamUrl
-    const streamUrl = (shareItem as any).model?.playAction?.episodeOffer?.streamUrl
+    const streamUrl = (shareItem as {
+      model?: {
+        playAction?: {
+          episodeOffer?: {
+            streamUrl?: string;
+          };
+        };
+      };
+    }).model?.playAction?.episodeOffer?.streamUrl
 
     if (!streamUrl) {
       return { error: "Could not find the stream URL" }

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ExternalLink } from "lucide-react"
+import Image from "next/image"
 
 export default function DownloadForm() {
   const [metadata, setMetadata] = useState<EpisodeMetadata | null>(null)
@@ -200,7 +201,19 @@ export default function DownloadForm() {
                 <CardHeader>
                   <div className="flex items-start">
                     {metadata.thumbnailUrl && (
-                      <img src={metadata.thumbnailUrl} alt="Episode thumbnail" className="w-24 h-24 object-cover rounded" />
+                      <Image 
+                        src={metadata.thumbnailUrl} 
+                        alt="Episode thumbnail" 
+                        width={96}
+                        height={96}
+                        className="w-24 h-24 object-cover rounded"
+                        unoptimized
+                        onError={(e) => {
+                          console.warn('Failed to load thumbnail:', metadata.thumbnailUrl);
+                          // Hide the image on error
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                     )}
 
                     <div className="ml-4 space-y-1">

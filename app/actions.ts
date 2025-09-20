@@ -35,25 +35,27 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
       return { error: "Could not find the header button items" }
     }
 
-    const bookmarkItem = headerButtonItems.find((item: unknown) => {
+    // Use yt-dlp's approach: look for 'share' items with 'EpisodeLockup' modelType
+    const shareItem = headerButtonItems.find((item: unknown) => {
       if (
         typeof item === "object" &&
         item !== null &&
         "$kind" in item &&
         "modelType" in item &&
-        (item as { $kind: unknown }).$kind === "bookmark" &&
-        (item as { modelType: unknown }).modelType === "EpisodeOffer"
+        (item as { $kind: unknown }).$kind === "share" &&
+        (item as { modelType: unknown }).modelType === "EpisodeLockup"
       ) {
         return true;
       }
       return false;
     });
 
-    if (!bookmarkItem) {
-      return { error: "Could not find the bookmark item" }
+    if (!shareItem) {
+      return { error: "Could not find the share item with episode data" }
     }
 
-    const streamUrl = bookmarkItem.model.streamUrl
+    // Navigate to the stream URL using yt-dlp's path: playAction.episodeOffer.streamUrl
+    const streamUrl = (shareItem as any).model?.playAction?.episodeOffer?.streamUrl
 
     if (!streamUrl) {
       return { error: "Could not find the stream URL" }

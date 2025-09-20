@@ -206,7 +206,8 @@ export default function DownloadForm() {
                         alt="Episode thumbnail" 
                         width={96}
                         height={96}
-                        className="w-24 h-24 object-cover rounded" 
+                        className="w-24 h-24 object-cover rounded"
+                        unoptimized
                       />
                     )}
 

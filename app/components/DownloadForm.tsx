@@ -208,6 +208,11 @@ export default function DownloadForm() {
                         height={96}
                         className="w-24 h-24 object-cover rounded"
                         unoptimized
+                        onError={(e) => {
+                          console.warn('Failed to load thumbnail:', metadata.thumbnailUrl);
+                          // Hide the image on error
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     )}
 

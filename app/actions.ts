@@ -8,29 +8,65 @@ import type { DownloadUrlResponse, TranscriptResponse, ReadwiseResponse, Episode
 
 console.log("DEEPGRAM_API_KEY is set:", !!process.env.DEEPGRAM_API_KEY)
 
+const APPLE_PODCAST_BROWSER_HEADERS: HeadersInit = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+  "Accept-Language": "en-GB,en;q=0.9",
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function extractPageData(scriptContent: string): Record<string, unknown> | null {
-  const parsed = JSON.parse(scriptContent) as unknown
-
-  const entries = Array.isArray(parsed)
-    ? parsed
-    : isRecord(parsed) && Array.isArray(parsed.data)
-      ? parsed.data
-      : []
-
-  for (const entry of entries) {
-    if (isRecord(entry) && isRecord(entry.data)) {
-      return entry.data
+type ShareItemWithStreamUrl = {
+  model?: {
+    playAction?: {
+      episodeOffer?: {
+        streamUrl?: string
+      }
     }
   }
-
-  return null
 }
 
-function findStreamUrl(node: unknown): string | null {
+type StreamUrlCandidate = {
+  url: string
+  path: string
+  score: number
+}
+
+function extractPageDataCandidates(parsed: unknown): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = []
+
+  if (Array.isArray(parsed)) {
+    for (const entry of parsed) {
+      if (isRecord(entry) && isRecord(entry.data)) {
+        candidates.push(entry.data)
+      } else if (isRecord(entry)) {
+        candidates.push(entry)
+      }
+    }
+    return candidates
+  }
+
+  if (isRecord(parsed) && Array.isArray(parsed.data)) {
+    for (const entry of parsed.data) {
+      if (isRecord(entry) && isRecord(entry.data)) {
+        candidates.push(entry.data)
+      } else if (isRecord(entry)) {
+        candidates.push(entry)
+      }
+    }
+    return candidates
+  }
+
+  if (isRecord(parsed) && isRecord(parsed.data)) {
+    candidates.push(parsed.data)
+  }
+
+  return candidates
+}
+
+function findShareItemStreamUrl(node: unknown): string | null {
   const queue: unknown[] = [node]
   const seen = new Set<unknown>()
 
@@ -47,11 +83,16 @@ function findStreamUrl(node: unknown): string | null {
       continue
     }
 
-    for (const [key, value] of Object.entries(current)) {
-      if (key === "streamUrl" && typeof value === "string") {
-        return value
+    const record = current as Record<string, unknown>
+    const isShareItem = record.$kind === "share" && record.modelType === "EpisodeLockup"
+    if (isShareItem) {
+      const streamUrl = (record as ShareItemWithStreamUrl).model?.playAction?.episodeOffer?.streamUrl
+      if (typeof streamUrl === "string" && streamUrl.startsWith("http")) {
+        return streamUrl
       }
+    }
 
+    for (const value of Object.values(record)) {
       if (value && typeof value === "object") {
         queue.push(value)
       }
@@ -59,6 +100,114 @@ function findStreamUrl(node: unknown): string | null {
   }
 
   return null
+}
+
+function findHeaderButtonItemsStreamUrl(pageDataCandidates: Record<string, unknown>[]): string | null {
+  for (const pageData of pageDataCandidates) {
+    const headerButtonItems = Array.isArray(pageData.headerButtonItems) ? pageData.headerButtonItems : null
+    if (!headerButtonItems) {
+      continue
+    }
+
+    const shareItem = headerButtonItems.find((item: unknown) => {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "$kind" in item &&
+        "modelType" in item &&
+        (item as { $kind: unknown }).$kind === "share" &&
+        (item as { modelType: unknown }).modelType === "EpisodeLockup"
+      ) {
+        return true
+      }
+      return false
+    })
+
+    if (!shareItem) {
+      continue
+    }
+
+    const streamUrl = (shareItem as ShareItemWithStreamUrl).model?.playAction?.episodeOffer?.streamUrl
+    if (typeof streamUrl === "string" && streamUrl.startsWith("http")) {
+      return streamUrl
+    }
+  }
+
+  return null
+}
+
+function scoreStreamUrlCandidate(url: string, path: string): number {
+  const normalizedPath = path.toLowerCase()
+  let score = 0
+
+  if (normalizedPath.includes("episodeoffer.streamurl")) score += 120
+  if (normalizedPath.includes("playaction")) score += 60
+  if (normalizedPath.includes("headerbuttonitems")) score += 35
+  if (normalizedPath.includes("contextaction")) score += 25
+  if (normalizedPath.includes("primarybuttonaction")) score += 25
+  if (/\.(mp3|m4a|aac|ogg)(\?|$)/i.test(url)) score += 35
+  if (url.startsWith("https://")) score += 10
+
+  return score
+}
+
+function findBestScoredStreamUrl(node: unknown): string | null {
+  const queue: Array<{ node: unknown; path: string }> = [{ node, path: "root" }]
+  const seen = new Set<unknown>()
+  const seenUrls = new Set<string>()
+  const candidates: StreamUrlCandidate[] = []
+
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i].node
+    const path = queue[i].path
+
+    if (!current || typeof current !== "object" || seen.has(current)) {
+      continue
+    }
+
+    seen.add(current)
+
+    if (Array.isArray(current)) {
+      for (let index = 0; index < current.length; index++) {
+        queue.push({ node: current[index], path: `${path}[${index}]` })
+      }
+      continue
+    }
+
+    const record = current as Record<string, unknown>
+    for (const [key, value] of Object.entries(record)) {
+      const nextPath = `${path}.${key}`
+
+      if (key === "streamUrl" && typeof value === "string" && value.startsWith("http")) {
+        const url = value.trim()
+        if (!seenUrls.has(url)) {
+          seenUrls.add(url)
+          candidates.push({
+            url,
+            path: nextPath,
+            score: scoreStreamUrlCandidate(url, nextPath),
+          })
+        }
+      }
+
+      if (value && typeof value === "object") {
+        queue.push({ node: value, path: nextPath })
+      }
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null
+  }
+
+  candidates.sort((left, right) => {
+    if (left.score !== right.score) {
+      return right.score - left.score
+    }
+    return left.path.length - right.path.length
+  })
+
+  return candidates[0].url
 }
 
 export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlResponse> {
@@ -69,9 +218,19 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
   }
 
   try {
-    const response = await fetch(url)
+    let response = await fetch(url, { headers: APPLE_PODCAST_BROWSER_HEADERS })
+
     if (!response.ok) {
-      return { error: `Could not fetch the Apple Podcasts page (HTTP ${response.status})` }
+      const fallbackResponse = await fetch(url)
+      if (!fallbackResponse.ok) {
+        return {
+          error:
+            `Could not fetch Apple Podcasts page (` +
+            `HTTP ${response.status} with browser-like headers, ` +
+            `HTTP ${fallbackResponse.status} with default request)`,
+        }
+      }
+      response = fallbackResponse
     }
 
     const html = await response.text()
@@ -80,60 +239,40 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
     const scriptContent = $("#serialized-server-data").html()
 
     if (!scriptContent) {
-      return { error: "Could not find the required data in the page" }
+      return { error: "Could not find Apple serialized episode data in the page" }
     }
 
-    const data = extractPageData(scriptContent)
-    if (!data) {
-      return { error: "Could not parse episode data from Apple Podcasts page" }
+    let parsedPayload: unknown
+    try {
+      parsedPayload = JSON.parse(scriptContent) as unknown
+    } catch {
+      return { error: "Could not parse Apple serialized episode data JSON" }
     }
 
-    const headerButtonItems = Array.isArray(data.headerButtonItems) ? data.headerButtonItems : null
-
-    let streamUrl: string | null = null
-
-    if (headerButtonItems) {
-      // Prefer yt-dlp's approach first: find the share item for the EpisodeLockup model.
-      const shareItem = headerButtonItems.find((item: unknown) => {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "$kind" in item &&
-          "modelType" in item &&
-          (item as { $kind: unknown }).$kind === "share" &&
-          (item as { modelType: unknown }).modelType === "EpisodeLockup"
-        ) {
-          return true
-        }
-        return false
-      })
-
-      if (shareItem) {
-        streamUrl = (shareItem as {
-          model?: {
-            playAction?: {
-              episodeOffer?: {
-                streamUrl?: string
-              }
-            }
-          }
-        }).model?.playAction?.episodeOffer?.streamUrl ?? null
-      }
+    // 1) Strict semantic extraction: share + EpisodeLockup + playAction.episodeOffer.streamUrl.
+    const strictStreamUrl = findShareItemStreamUrl(parsedPayload)
+    if (strictStreamUrl) {
+      return { downloadUrl: strictStreamUrl }
     }
 
-    if (!streamUrl) {
-      // Fallback for Apple payload shape changes.
-      streamUrl = findStreamUrl(data)
+    // 2) Known path extraction for older payload shapes.
+    const pageDataCandidates = extractPageDataCandidates(parsedPayload)
+    const knownPathStreamUrl = findHeaderButtonItemsStreamUrl(pageDataCandidates)
+    if (knownPathStreamUrl) {
+      return { downloadUrl: knownPathStreamUrl }
     }
 
-    if (!streamUrl) {
-      return { error: "Could not find the stream URL in Apple Podcasts page data" }
+    // 3) Last-resort fallback: score all discovered streamUrl candidates and pick the best fit.
+    const fallbackStreamUrl = findBestScoredStreamUrl(parsedPayload)
+    if (fallbackStreamUrl) {
+      return { downloadUrl: fallbackStreamUrl }
     }
 
-    return { downloadUrl: streamUrl }
+    return { error: "Could not locate a usable stream URL in Apple Podcasts page data" }
   } catch (error) {
     console.error("Error:", error)
-    return { error: "An error occurred while processing the URL" }
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return { error: `An error occurred while processing the URL: ${message}` }
   }
 }
 

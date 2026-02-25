@@ -12,6 +12,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+type ShareItem = {
+  model?: {
+    playAction?: {
+      episodeOffer?: {
+        streamUrl?: string
+      }
+    }
+  }
+}
+
+const findShareItemWithStreamUrl = (node: unknown): ShareItem | null => {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const result = findShareItemWithStreamUrl(item)
+      if (result) return result
+    }
+    return null
+  }
+
+  if (!isRecord(node)) {
+    return null
+  }
+
+  if (node.$kind === "share" && node.modelType === "EpisodeLockup") {
+    const candidate = node as ShareItem
+    if (candidate.model?.playAction?.episodeOffer?.streamUrl) {
+      return candidate
+    }
+  }
+
+  for (const value of Object.values(node)) {
+    const result = findShareItemWithStreamUrl(value)
+    if (result) return result
+  }
+
+  return null
+}
+
 function extractPageData(scriptContent: string): Record<string, unknown> | null {
   const parsed = JSON.parse(scriptContent) as unknown
 
@@ -69,9 +107,16 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
   }
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+        "Accept-Language": "en-GB,en;q=0.9",
+      },
+    })
+
     if (!response.ok) {
-      return { error: `Could not fetch the Apple Podcasts page (HTTP ${response.status})` }
+      return { error: `Apple Podcasts returned ${response.status} while loading this episode` }
     }
 
     const html = await response.text()
@@ -88,41 +133,31 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
       return { error: "Could not parse episode data from Apple Podcasts page" }
     }
 
-    const headerButtonItems = Array.isArray(data.headerButtonItems) ? data.headerButtonItems : null
-
     let streamUrl: string | null = null
 
-    if (headerButtonItems) {
-      // Prefer yt-dlp's approach first: find the share item for the EpisodeLockup model.
-      const shareItem = headerButtonItems.find((item: unknown) => {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "$kind" in item &&
-          "modelType" in item &&
-          (item as { $kind: unknown }).$kind === "share" &&
-          (item as { modelType: unknown }).modelType === "EpisodeLockup"
-        ) {
-          return true
-        }
-        return false
-      })
+    // Approach 1: recurse through full payload for EpisodeLockup share item.
+    const shareItem = findShareItemWithStreamUrl(data)
+    if (shareItem) {
+      streamUrl = shareItem.model?.playAction?.episodeOffer?.streamUrl ?? null
+    }
 
-      if (shareItem) {
-        streamUrl = (shareItem as {
-          model?: {
-            playAction?: {
-              episodeOffer?: {
-                streamUrl?: string
-              }
-            }
-          }
-        }).model?.playAction?.episodeOffer?.streamUrl ?? null
+    // Approach 2: if needed, attempt the headerButtonItems path explicitly.
+    if (!streamUrl) {
+      const headerButtonItems = Array.isArray(data.headerButtonItems) ? data.headerButtonItems : null
+      if (headerButtonItems) {
+        const headerShareItem = headerButtonItems.find((item: unknown) => {
+          if (!isRecord(item)) return false
+          return item.$kind === "share" && item.modelType === "EpisodeLockup"
+        })
+
+        if (headerShareItem) {
+          streamUrl = (headerShareItem as ShareItem).model?.playAction?.episodeOffer?.streamUrl ?? null
+        }
       }
     }
 
+    // Approach 3: fallback search for any streamUrl in the page data.
     if (!streamUrl) {
-      // Fallback for Apple payload shape changes.
       streamUrl = findStreamUrl(data)
     }
 

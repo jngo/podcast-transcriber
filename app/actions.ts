@@ -16,7 +16,18 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
   }
 
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+        "Accept-Language": "en-GB,en;q=0.9",
+      },
+    })
+
+    if (!response.ok) {
+      return { error: `Apple Podcasts returned ${response.status} while loading this episode` }
+    }
+
     const html = await response.text()
 
     const $ = load(html)
@@ -26,29 +37,59 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
       return { error: "Could not find the required data in the page" }
     }
 
-    const jsonData = JSON.parse(scriptContent)
-    const data = jsonData[0].data
+    const jsonData: unknown = JSON.parse(scriptContent)
 
-    const headerButtonItems = data.headerButtonItems
+    function findShareItemWithStreamUrl(node: unknown):
+      | {
+          model?: {
+            playAction?: {
+              episodeOffer?: {
+                streamUrl?: string
+              }
+            }
+          }
+        }
+      | null {
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const result = findShareItemWithStreamUrl(item)
+          if (result) return result
+        }
+        return null
+      }
 
-    if (!headerButtonItems || !Array.isArray(headerButtonItems)) {
-      return { error: "Could not find the header button items" }
+      if (typeof node !== "object" || node === null) {
+        return null
+      }
+
+      const record = node as Record<string, unknown>
+      const matchesShareItem = record.$kind === "share" && record.modelType === "EpisodeLockup"
+
+      if (matchesShareItem) {
+        const candidate = record as {
+          model?: {
+            playAction?: {
+              episodeOffer?: {
+                streamUrl?: string
+              }
+            }
+          }
+        }
+
+        if (candidate.model?.playAction?.episodeOffer?.streamUrl) {
+          return candidate
+        }
+      }
+
+      for (const value of Object.values(record)) {
+        const result = findShareItemWithStreamUrl(value)
+        if (result) return result
+      }
+
+      return null
     }
 
-    // Use yt-dlp's approach: look for 'share' items with 'EpisodeLockup' modelType
-    const shareItem = headerButtonItems.find((item: unknown) => {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        "$kind" in item &&
-        "modelType" in item &&
-        (item as { $kind: unknown }).$kind === "share" &&
-        (item as { modelType: unknown }).modelType === "EpisodeLockup"
-      ) {
-        return true;
-      }
-      return false;
-    });
+    const shareItem = findShareItemWithStreamUrl(jsonData)
 
     if (!shareItem) {
       return { error: "Could not find the share item with episode data" }
@@ -72,7 +113,8 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
     return { downloadUrl: streamUrl }
   } catch (error) {
     console.error("Error:", error)
-    return { error: "An error occurred while processing the URL" }
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return { error: `An error occurred while processing the URL: ${message}` }
   }
 }
 

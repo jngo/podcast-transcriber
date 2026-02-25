@@ -8,6 +8,59 @@ import type { DownloadUrlResponse, TranscriptResponse, ReadwiseResponse, Episode
 
 console.log("DEEPGRAM_API_KEY is set:", !!process.env.DEEPGRAM_API_KEY)
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function extractPageData(scriptContent: string): Record<string, unknown> | null {
+  const parsed = JSON.parse(scriptContent) as unknown
+
+  const entries = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.data)
+      ? parsed.data
+      : []
+
+  for (const entry of entries) {
+    if (isRecord(entry) && isRecord(entry.data)) {
+      return entry.data
+    }
+  }
+
+  return null
+}
+
+function findStreamUrl(node: unknown): string | null {
+  const queue: unknown[] = [node]
+  const seen = new Set<unknown>()
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (!current || typeof current !== "object" || seen.has(current)) {
+      continue
+    }
+
+    seen.add(current)
+
+    if (Array.isArray(current)) {
+      queue.push(...current)
+      continue
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (key === "streamUrl" && typeof value === "string") {
+        return value
+      }
+
+      if (value && typeof value === "object") {
+        queue.push(value)
+      }
+    }
+  }
+
+  return null
+}
+
 export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlResponse> {
   const url = formData.get("url") as string
 
@@ -17,6 +70,10 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
 
   try {
     const response = await fetch(url)
+    if (!response.ok) {
+      return { error: `Could not fetch the Apple Podcasts page (HTTP ${response.status})` }
+    }
+
     const html = await response.text()
 
     const $ = load(html)
@@ -26,47 +83,51 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
       return { error: "Could not find the required data in the page" }
     }
 
-    const jsonData = JSON.parse(scriptContent)
-    const data = jsonData[0].data
-
-    const headerButtonItems = data.headerButtonItems
-
-    if (!headerButtonItems || !Array.isArray(headerButtonItems)) {
-      return { error: "Could not find the header button items" }
+    const data = extractPageData(scriptContent)
+    if (!data) {
+      return { error: "Could not parse episode data from Apple Podcasts page" }
     }
 
-    // Use yt-dlp's approach: look for 'share' items with 'EpisodeLockup' modelType
-    const shareItem = headerButtonItems.find((item: unknown) => {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        "$kind" in item &&
-        "modelType" in item &&
-        (item as { $kind: unknown }).$kind === "share" &&
-        (item as { modelType: unknown }).modelType === "EpisodeLockup"
-      ) {
-        return true;
+    const headerButtonItems = Array.isArray(data.headerButtonItems) ? data.headerButtonItems : null
+
+    let streamUrl: string | null = null
+
+    if (headerButtonItems) {
+      // Prefer yt-dlp's approach first: find the share item for the EpisodeLockup model.
+      const shareItem = headerButtonItems.find((item: unknown) => {
+        if (
+          typeof item === "object" &&
+          item !== null &&
+          "$kind" in item &&
+          "modelType" in item &&
+          (item as { $kind: unknown }).$kind === "share" &&
+          (item as { modelType: unknown }).modelType === "EpisodeLockup"
+        ) {
+          return true
+        }
+        return false
+      })
+
+      if (shareItem) {
+        streamUrl = (shareItem as {
+          model?: {
+            playAction?: {
+              episodeOffer?: {
+                streamUrl?: string
+              }
+            }
+          }
+        }).model?.playAction?.episodeOffer?.streamUrl ?? null
       }
-      return false;
-    });
-
-    if (!shareItem) {
-      return { error: "Could not find the share item with episode data" }
     }
-
-    // Navigate to the stream URL using yt-dlp's path: playAction.episodeOffer.streamUrl
-    const streamUrl = (shareItem as {
-      model?: {
-        playAction?: {
-          episodeOffer?: {
-            streamUrl?: string;
-          };
-        };
-      };
-    }).model?.playAction?.episodeOffer?.streamUrl
 
     if (!streamUrl) {
-      return { error: "Could not find the stream URL" }
+      // Fallback for Apple payload shape changes.
+      streamUrl = findStreamUrl(data)
+    }
+
+    if (!streamUrl) {
+      return { error: "Could not find the stream URL in Apple Podcasts page data" }
     }
 
     return { downloadUrl: streamUrl }

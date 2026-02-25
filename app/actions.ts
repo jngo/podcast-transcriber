@@ -8,6 +8,48 @@ import type { DownloadUrlResponse, TranscriptResponse, ReadwiseResponse, Episode
 
 console.log("DEEPGRAM_API_KEY is set:", !!process.env.DEEPGRAM_API_KEY)
 
+type ShareItemWithStreamUrl = {
+  model?: {
+    playAction?: {
+      episodeOffer?: {
+        streamUrl?: string
+      }
+    }
+  }
+}
+
+const findShareItemWithStreamUrl = (node: unknown): ShareItemWithStreamUrl | null => {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const result = findShareItemWithStreamUrl(item)
+      if (result) return result
+    }
+    return null
+  }
+
+  if (typeof node !== "object" || node === null) {
+    return null
+  }
+
+  const record = node as Record<string, unknown>
+  const matchesShareItem = record.$kind === "share" && record.modelType === "EpisodeLockup"
+
+  if (matchesShareItem) {
+    const candidate = record as ShareItemWithStreamUrl
+
+    if (candidate.model?.playAction?.episodeOffer?.streamUrl) {
+      return candidate
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    const result = findShareItemWithStreamUrl(value)
+    if (result) return result
+  }
+
+  return null
+}
+
 export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlResponse> {
   const url = formData.get("url") as string
 
@@ -38,56 +80,6 @@ export async function getDownloadUrl(formData: FormData): Promise<DownloadUrlRes
     }
 
     const jsonData: unknown = JSON.parse(scriptContent)
-
-    function findShareItemWithStreamUrl(node: unknown):
-      | {
-          model?: {
-            playAction?: {
-              episodeOffer?: {
-                streamUrl?: string
-              }
-            }
-          }
-        }
-      | null {
-      if (Array.isArray(node)) {
-        for (const item of node) {
-          const result = findShareItemWithStreamUrl(item)
-          if (result) return result
-        }
-        return null
-      }
-
-      if (typeof node !== "object" || node === null) {
-        return null
-      }
-
-      const record = node as Record<string, unknown>
-      const matchesShareItem = record.$kind === "share" && record.modelType === "EpisodeLockup"
-
-      if (matchesShareItem) {
-        const candidate = record as {
-          model?: {
-            playAction?: {
-              episodeOffer?: {
-                streamUrl?: string
-              }
-            }
-          }
-        }
-
-        if (candidate.model?.playAction?.episodeOffer?.streamUrl) {
-          return candidate
-        }
-      }
-
-      for (const value of Object.values(record)) {
-        const result = findShareItemWithStreamUrl(value)
-        if (result) return result
-      }
-
-      return null
-    }
 
     const shareItem = findShareItemWithStreamUrl(jsonData)
 

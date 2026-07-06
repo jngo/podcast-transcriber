@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ideation: Podcast Workflow Friction</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5f6b7a;
+      --line: #d8dee8;
+      --accent: #176b87;
+      --accent-soft: #e5f3f6;
+      --accent-text: #114a5e;
+      --green-soft: #e8f5ee;
+      --green-text: #245a3b;
+      --amber-soft: #fbf1dc;
+      --amber-text: #6b4a12;
+      --blue-soft: #e8f0fb;
+      --blue-text: #244f88;
+      --red-soft: #fbe8e7;
+      --red-text: #8a332b;
+      --shadow: 0 10px 30px rgba(28, 39, 52, 0.08);
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      font-size: 16px;
+    }
+    a { color: var(--accent); text-decoration-thickness: 0.08em; text-underline-offset: 0.18em; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+      background: #eef1f5;
+      padding: 0.08rem 0.28rem;
+      border-radius: 4px;
+    }
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 44px 22px 56px;
+    }
+    header.hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 30px;
+      box-shadow: var(--shadow);
+    }
+    .eyebrow {
+      color: var(--accent-text);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.76rem;
+      font-weight: 750;
+      margin: 0 0 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 40px 0 14px;
+      font-size: 1.55rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 0;
+      font-size: 1.18rem;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+    p { max-width: 74ch; }
+    .metadata {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .meta-item {
+      border: 1px solid var(--line);
+      background: #fbfcfd;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .meta-item dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+    .meta-item dd { margin: 2px 0 0; font-weight: 650; }
+    nav.toc, .jump-list, section, article.idea, .callout {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    nav.toc {
+      margin-top: 18px;
+      padding: 16px 18px;
+    }
+    nav.toc ul, .jump-list ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      columns: 2;
+    }
+    section {
+      padding: 24px;
+      margin-top: 22px;
+    }
+    section > h2:first-child { margin-top: 0; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .stat {
+      padding: 14px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      border: 1px solid #c9e6ed;
+    }
+    .stat strong {
+      display: block;
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+    .axis-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+      margin: 0;
+    }
+    .axis-list li {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-weight: 650;
+    }
+    .jump-list {
+      padding: 16px 18px;
+      margin: 0 0 16px;
+      box-shadow: none;
+    }
+    article.idea {
+      margin-top: 16px;
+      padding: 20px;
+    }
+    .idea-head {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .idea-title {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+    }
+    .rank {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: white;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .chip {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 0.78rem;
+      font-weight: 750;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .chip.axis { background: var(--blue-soft); color: var(--blue-text); border-color: #ccdcef; }
+    .chip.high { background: var(--green-soft); color: var(--green-text); border-color: #cfe8da; }
+    .chip.med { background: var(--amber-soft); color: var(--amber-text); border-color: #ead7ad; }
+    .chip.cx { background: #edf0f4; color: #344152; border-color: #dce2ea; }
+    dl.fields {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 9px 16px;
+      margin: 18px 0 0;
+    }
+    dl.fields dt {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 750;
+    }
+    dl.fields dd { margin: 0; }
+    .callout {
+      padding: 16px 18px;
+      box-shadow: none;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      border-color: #c9e6ed;
+    }
+    .diagram {
+      margin: 18px 0 4px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfcfd;
+      padding: 12px;
+      overflow-x: auto;
+    }
+    svg { max-width: 100%; height: auto; display: block; }
+    .svg-label { font: 700 13px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #1d2b3a; }
+    .svg-small { font: 500 11px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4e5d6e; }
+    .arrow { stroke: #647487; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.94rem;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 9px;
+    }
+    th {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .source-list li { margin: 8px 0; }
+    footer.composition-signal {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    @media (max-width: 780px) {
+      .metadata, .stats, .axis-list { grid-template-columns: 1fr; }
+      nav.toc ul, .jump-list ul { columns: 1; }
+      .idea-head { flex-direction: column; }
+      .chips { justify-content: flex-start; }
+      dl.fields { grid-template-columns: 1fr; }
+      .page { padding: 24px 14px 44px; }
+      header.hero, section, article.idea { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">ce-ideate artifact</p>
+      <h1>Ideation: Podcast Workflow Friction</h1>
+      <p>Open-ended product directions for removing steps between hearing a valuable Apple Podcasts moment and having useful, highlightable source material in Readwise Reader.</p>
+      <dl class="metadata">
+        <div class="meta-item"><dt>Date</dt><dd><time datetime="2026-07-03">2026-07-03</time></dd></div>
+        <div class="meta-item"><dt>Topic</dt><dd>podcast-workflow-friction</dd></div>
+        <div class="meta-item"><dt>Focus</dt><dd>Apple Podcasts to Reader highlight workflow</dd></div>
+        <div class="meta-item"><dt>Mode</dt><dd>repo-grounded</dd></div>
+      </dl>
+      <div class="stats" aria-label="Ideation summary">
+        <div class="stat"><strong>40+</strong> raw frame ideas</div>
+        <div class="stat"><strong>12</strong> merged candidates</div>
+        <div class="stat"><strong>6</strong> ranked survivors</div>
+        <div class="stat"><strong>4</strong> workflow axes covered</div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Document navigation">
+      <ul>
+        <li><a href="#grounding-context">Grounding Context</a></li>
+        <li><a href="#topic-axes">Topic Axes</a></li>
+        <li><a href="#ranked-ideas">Ranked Ideas</a></li>
+        <li><a href="#rejection-summary">Rejection Summary</a></li>
+        <li><a href="#sources">Sources and References</a></li>
+      </ul>
+    </nav>
+
+    <section id="grounding-context">
+      <h2>Grounding Context</h2>
+      <p><strong>Codebase context.</strong> The current app starts with a pasted Apple Podcasts URL in <code>app/components/DownloadForm.tsx</code>. Server actions in <code>app/actions.ts</code> fetch Apple page data, extract an audio stream URL, call Deepgram for a full transcript, render transcript paragraphs, and save flat HTML to Readwise Reader.</p>
+      <p><strong>Strategic context.</strong> <code>STRATEGY.md</code> already names the core product tracks this workflow needs: frictionless capture, moment retrieval, source coverage, and destination integrations. It also narrows current scope to Apple Podcasts and Readwise Reader, which ruled out bigger destination-broadcast and podcast-library ideas.</p>
+      <p><strong>External context.</strong> Apple Podcasts now has transcript surfaces that can be searched, selected, copied, and shared from a point. Readwise Reader now supports saving Apple Podcasts links as highlightable podcast transcripts. That changes the product question: Podcast Transcriber does not necessarily need to own commodity full-episode ingestion; it can focus on preserving the exact moment and routing it well.</p>
+      <p><strong>Verification result.</strong> A fresh-context verifier judged the strongest grounded candidates to be the capture rail, moment-first intake, timed transcript schema, Reader moment artifact, Reader-native routing, and capture state ledger. Parallel Readwise highlight creation was weaker but still retained because it directly attacks the final manual highlight step.</p>
+    </section>
+
+    <section id="topic-axes">
+      <h2>Topic Axes</h2>
+      <ul class="axis-list">
+        <li>Capture and intake trigger</li>
+        <li>Moment context preservation</li>
+        <li>Transcript processing and moment retrieval</li>
+        <li>Reader and Readwise handoff</li>
+      </ul>
+    </section>
+
+    <section id="ranked-ideas">
+      <h2>Ranked Ideas</h2>
+      <div class="jump-list">
+        <ul>
+          <li><a href="#idea-1">1. Moment-First Capture Rail</a></li>
+          <li><a href="#idea-2">2. Preserve Timing as the Canonical Transcript Shape</a></li>
+          <li><a href="#idea-3">3. Reader Teleport Artifact</a></li>
+          <li><a href="#idea-4">4. Precision Router</a></li>
+          <li><a href="#idea-5">5. Capture State Ledger</a></li>
+          <li><a href="#idea-6">6. Insurance Highlight Artifact</a></li>
+        </ul>
+      </div>
+
+      <article class="idea" id="idea-1">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">1</span><h3>1. Moment-First Capture Rail</h3></div>
+          <div class="chips"><span class="chip axis">Capture and intake trigger</span><span class="chip high">Conf 88%</span><span class="chip cx">Cx Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> Replace the website-first workflow with an installed capture rail: an Apple share-sheet Shortcut that can receive an episode URL, selected Apple transcript text, or a short phrase, then POST that capture packet to Podcast Transcriber. The web app becomes a setup/status surface, not the thing the user must navigate to while listening. One-time identity and token setup should make later captures feel like a single action.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>direct:</strong> Current intake is a required pasted URL form, and token handling can still interrupt the save path. <strong>external:</strong> Apple Shortcuts can run from another app's share sheet and accept input such as URLs/text, while Apple transcript text can be shared from a point.</dd>
+          <dt>Rationale</dt>
+          <dd>This removes the largest up-front friction cluster: copying a URL, switching to a browser, opening the site, pasting, and thinking about credentials. It also creates the common entry point needed for quote-first and background variants.</dd>
+          <dt>Downsides</dt>
+          <dd>Requires setup, an HTTP endpoint, token/storage decisions, and careful handling of what Apple Podcasts actually passes through the share sheet. The first version should stay humble: share input plus optional phrase, not full hands-free magic.</dd>
+        </dl>
+        <div class="diagram" aria-label="Moment-first capture rail flow">
+          <svg viewBox="0 0 820 150" role="img" aria-label="Flow from Apple Podcasts to Shortcut to capture packet to Reader">
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#647487"></path>
+              </marker>
+            </defs>
+            <rect x="18" y="38" width="150" height="70" rx="10" fill="#e8f0fb" stroke="#bfd0e8"></rect>
+            <text x="93" y="68" text-anchor="middle" class="svg-label">Apple Podcasts</text>
+            <text x="93" y="88" text-anchor="middle" class="svg-small">URL or transcript snippet</text>
+            <path d="M178 73 H268" class="arrow"></path>
+            <rect x="278" y="38" width="142" height="70" rx="10" fill="#e5f3f6" stroke="#bfdfe8"></rect>
+            <text x="349" y="68" text-anchor="middle" class="svg-label">Shortcut</text>
+            <text x="349" y="88" text-anchor="middle" class="svg-small">one tap capture</text>
+            <path d="M430 73 H520" class="arrow"></path>
+            <rect x="530" y="38" width="126" height="70" rx="10" fill="#fbf1dc" stroke="#ead7ad"></rect>
+            <text x="593" y="68" text-anchor="middle" class="svg-label">PT Endpoint</text>
+            <text x="593" y="88" text-anchor="middle" class="svg-small">capture packet</text>
+            <path d="M666 73 H738" class="arrow"></path>
+            <rect x="748" y="38" width="54" height="70" rx="10" fill="#e8f5ee" stroke="#cfe8da"></rect>
+            <text x="775" y="68" text-anchor="middle" class="svg-label">Reader</text>
+            <text x="775" y="88" text-anchor="middle" class="svg-small">ready</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="idea" id="idea-2">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">2</span><h3>2. Preserve Timing as the Canonical Transcript Shape</h3></div>
+          <div class="chips"><span class="chip axis">Moment context preservation</span><span class="chip high">Conf 90%</span><span class="chip cx">Cx Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> Stop treating transcripts as <code>string[]</code>. Preserve a timed internal schema: paragraphs, utterances, start/end offsets, confidence, and any speaker-like boundaries Deepgram returns. Even if the first user feature is modest, this makes every later retrieval, highlight, quote card, and Reader handoff easier.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>direct:</strong> The app requests <code>paragraphs: true</code> and <code>utterances: true</code> from Deepgram, then returns newline-split paragraph strings. <strong>external:</strong> Deepgram utterances include start/end timestamps and word timing data.</dd>
+          <dt>Rationale</dt>
+          <dd>The current workflow loses the exact location data that could solve "find the moment later." Preserving timing turns retrieval into a data problem instead of a manual Reader search problem.</dd>
+          <dt>Downsides</dt>
+          <dd>This is plumbing before delight. It needs type changes, save-payload changes, and migration thinking if existing saved transcripts ever matter. It also depends on the quality of vendor timing and on how much of that timing Reader can use directly.</dd>
+        </dl>
+        <div class="diagram" aria-label="Transcript data before and after">
+          <svg viewBox="0 0 780 170" role="img" aria-label="Before flat transcript and after timed transcript schema">
+            <rect x="24" y="28" width="260" height="108" rx="10" fill="#f2f4f7" stroke="#d8dee8"></rect>
+            <text x="154" y="58" text-anchor="middle" class="svg-label">Today</text>
+            <text x="154" y="82" text-anchor="middle" class="svg-small">Deepgram timing requested</text>
+            <text x="154" y="103" text-anchor="middle" class="svg-small">Flattened to paragraph strings</text>
+            <text x="154" y="124" text-anchor="middle" class="svg-small">Reader gets plain HTML</text>
+            <path d="M306 82 H472" class="arrow"></path>
+            <text x="389" y="64" text-anchor="middle" class="svg-small">keep structure</text>
+            <rect x="494" y="28" width="260" height="108" rx="10" fill="#e5f3f6" stroke="#bfdfe8"></rect>
+            <text x="624" y="58" text-anchor="middle" class="svg-label">Next</text>
+            <text x="624" y="82" text-anchor="middle" class="svg-small">Paragraph + utterance spans</text>
+            <text x="624" y="103" text-anchor="middle" class="svg-small">Start/end timestamps</text>
+            <text x="624" y="124" text-anchor="middle" class="svg-small">Search and jump anchors</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="idea" id="idea-3">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">3</span><h3>3. Reader Teleport Artifact</h3></div>
+          <div class="chips"><span class="chip axis">Transcript processing and moment retrieval</span><span class="chip high">Conf 84%</span><span class="chip cx">Cx Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> Change the saved Reader document from "full transcript only" into a self-locating artifact. The top of the document should include a moment index: captured quote, nearby anchor phrases, timestamp labels, short context, and maybe a link back to Apple Podcasts. The full transcript still follows, but the first screen helps the user land near the thought.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>direct:</strong> Current Reader save sends flat paragraph HTML. <strong>direct:</strong> Strategy names moment retrieval as a core track. <strong>external:</strong> Reader accepts supplied HTML for saved documents.</dd>
+          <dt>Rationale</dt>
+          <dd>This attacks the biggest downstream pain without depending on an undocumented native Reader highlight API. It improves the destination artifact itself, where the user already wants to highlight.</dd>
+          <dt>Downsides</dt>
+          <dd>Reader may sanitize or display HTML differently than expected. If the moment match is wrong, the index can create false confidence. It likely depends on idea 2 for best results.</dd>
+        </dl>
+        <div class="diagram" aria-label="Reader document with moment index">
+          <svg viewBox="0 0 760 190" role="img" aria-label="Reader document first screen with moment index before transcript">
+            <rect x="128" y="20" width="504" height="150" rx="12" fill="#ffffff" stroke="#c7d0dd"></rect>
+            <rect x="156" y="42" width="448" height="44" rx="8" fill="#e5f3f6" stroke="#bfdfe8"></rect>
+            <text x="380" y="62" text-anchor="middle" class="svg-label">Moment Index</text>
+            <text x="380" y="79" text-anchor="middle" class="svg-small">quote + timestamp + nearby phrases</text>
+            <rect x="156" y="100" width="448" height="14" rx="4" fill="#eef1f5"></rect>
+            <rect x="156" y="122" width="420" height="14" rx="4" fill="#eef1f5"></rect>
+            <rect x="156" y="144" width="390" height="14" rx="4" fill="#eef1f5"></rect>
+            <text x="88" y="68" text-anchor="middle" class="svg-small">first screen</text>
+            <path d="M102 68 H146" class="arrow"></path>
+          </svg>
+        </div>
+      </article>
+
+      <article class="idea" id="idea-4">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">4</span><h3>4. Precision Router</h3></div>
+          <div class="chips"><span class="chip axis">Reader and Readwise handoff</span><span class="chip high">Conf 82%</span><span class="chip cx">Cx Small-Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> Stop assuming Podcast Transcriber must always perform full-episode ingestion. If Reader can already save a normal Apple Podcasts transcript, route the user there for commodity saves. Use Podcast Transcriber when the user needs precision: quote seeding, timing preservation, unsupported episodes, or a Reader teleport artifact.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>external:</strong> Reader docs say Apple Podcasts links can be shared to Reader to save highlightable podcast transcripts. <strong>direct:</strong> Strategy says the product should integrate with existing knowledge systems rather than become another note manager.</dd>
+          <dt>Rationale</dt>
+          <dd>This may remove an entire duplicate path for ordinary cases and preserve development energy for the part Reader does not obviously solve: exact moment capture and retrieval.</dd>
+          <dt>Downsides</dt>
+          <dd>It requires honest testing of Reader's native Apple Podcasts support and a clear rule for when PT adds value. It may also feel like a product retreat unless framed as focus.</dd>
+        </dl>
+      </article>
+
+      <article class="idea" id="idea-5">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">5</span><h3>5. Capture State Ledger</h3></div>
+          <div class="chips"><span class="chip axis">Reader and Readwise handoff</span><span class="chip med">Conf 76%</span><span class="chip cx">Cx Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> Introduce a stable capture object with a visible <code>capture_id</code>. It ties together the Apple URL, selected quote or phrase, transcript job, matched moment, Reader document URL, optional Readwise highlight, retries, and failure states. The user does not need to keep a browser toast alive; the capture itself becomes resumable.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>direct:</strong> Existing analytics are useful but fragmented by funnel event. Current success returns a transient Reader link, not a durable workflow object.</dd>
+          <dt>Rationale</dt>
+          <dd>Nearly every ambitious friction reduction needs a stateful handoff. This creates the substrate for background processing, moment repair, status notifications, and later metrics around capture usefulness.</dd>
+          <dt>Downsides</dt>
+          <dd>It likely requires persistence, auth or personal identity, and data-retention decisions. It is less user-visible than the capture rail or Reader artifact until paired with them.</dd>
+        </dl>
+      </article>
+
+      <article class="idea" id="idea-6">
+        <div class="idea-head">
+          <div class="idea-title"><span class="rank">6</span><h3>6. Insurance Highlight Artifact</h3></div>
+          <div class="chips"><span class="chip axis">Reader and Readwise handoff</span><span class="chip med">Conf 64%</span><span class="chip cx">Cx Medium</span></div>
+        </div>
+        <p><strong>Description:</strong> When the system knows or strongly guesses the moment, create a parallel Readwise highlight or moment-only artifact with the quote, note, source URL, and podcast location metadata. The full Reader transcript remains the source document, but the valuable quote is captured even if native Reader highlighting still requires a manual pass.</p>
+        <dl class="fields">
+          <dt>Basis</dt>
+          <dd><strong>external:</strong> Readwise's highlight API supports podcast-category highlights and location fields. <strong>external:</strong> Reader's public API is document-oriented, so native Reader highlight creation was not established.</dd>
+          <dt>Rationale</dt>
+          <dd>This is the most direct attack on the final manual step: locate moment, select text, highlight. It turns an API limitation into a fallback product pattern.</dd>
+          <dt>Downsides</dt>
+          <dd>It may create a second object outside the Reader document, which can feel split-brained. The verifier judged it weaker than making the Reader document itself moment-aware, so this should be explored after idea 3 or as an optional companion.</dd>
+        </dl>
+      </article>
+    </section>
+
+    <section id="rejection-summary">
+      <h2>Rejection Summary</h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Idea</th><th>Reason Rejected</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Capture now, resolve later</td><td>Folded into the capture rail and state ledger; standalone version needs persistence and background jobs not yet present.</td></tr>
+          <tr><td>2</td><td>Physical or voice capture button</td><td>Good future variant, but current evidence establishes share-sheet Shortcuts, not headphone, Watch, CarPlay, or Action Button behavior.</td></tr>
+          <tr><td>3</td><td>Focused audio-window transcription</td><td>Plausible only with reliable timestamp and partial-audio support; grounding did not establish the path.</td></tr>
+          <tr><td>4</td><td>Personal podcast memory layer</td><td>Too large and outside the current Apple Podcasts to Reader workflow; would become a standing ingestion product.</td></tr>
+          <tr><td>5</td><td>Parallel destination broadcast</td><td>Out of current scope because the strategy keeps Reader as the workflow anchor.</td></tr>
+          <tr><td>6</td><td>Pre-transcribe active shows</td><td>Interesting inversion, but expensive and broader than the immediate friction in the described workflow.</td></tr>
+          <tr><td>7</td><td>Hardcoded one-person happy path</td><td>Useful implementation variant of the capture rail, not a distinct strategic direction.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sources">
+      <h2>Sources and References</h2>
+      <ul class="source-list">
+        <li><a href="https://github.com/jngo/podcast-transcriber/blob/main/STRATEGY.md">STRATEGY.md</a> - product tracks and current scope.</li>
+        <li><a href="https://github.com/jngo/podcast-transcriber/blob/main/EVENTS.md">EVENTS.md</a> - current analytics funnel events.</li>
+        <li><a href="https://github.com/jngo/podcast-transcriber/blob/main/app/components/DownloadForm.tsx">app/components/DownloadForm.tsx</a> - current pasted-URL UI and Readwise token flow.</li>
+        <li><a href="https://github.com/jngo/podcast-transcriber/blob/main/app/actions.ts">app/actions.ts</a> - Apple parsing, Deepgram transcription, and Readwise save behavior.</li>
+        <li><a href="https://podcasters.apple.com/support/5316-transcripts-on-apple-podcasts">Apple Podcasts transcript support</a> - transcript search, copy/share, and availability.</li>
+        <li><a href="https://support.apple.com/guide/iphone/view-podcast-transcripts-iph9426049e9/ios">Apple iPhone transcript guide</a> - select, copy, play, and share from transcript points.</li>
+        <li><a href="https://support.apple.com/guide/podcasts/share-podcasts-pod96aaf8353/mac">Apple Podcasts Mac sharing guide</a> - share selected transcript text from a timestamp.</li>
+        <li><a href="https://support.apple.com/guide/shortcuts/launch-a-shortcut-from-another-app-apd163eb9f95/ios">Apple Shortcuts share-sheet guide</a> - run shortcuts from another app.</li>
+        <li><a href="https://support.apple.com/guide/shortcuts/input-types-apd7644168e1/ios">Apple Shortcuts input types</a> - URL and text input handling.</li>
+        <li><a href="https://docs.readwise.io/reader/docs/faqs/adding-new-content">Readwise Reader adding content docs</a> - podcast save support including Apple Podcasts.</li>
+        <li><a href="https://readwise.io/reader_api">Readwise Reader API</a> - document save/list/update surface.</li>
+        <li><a href="https://readwise.io/api_deets">Readwise API</a> - highlight creation surface.</li>
+        <li><a href="https://docs.readwise.io/changelog">Readwise and Reader changelog</a> - current podcast and API signals.</li>
+        <li><a href="https://www.snipd.com/">Snipd</a> - one-tap podcast insight capture prior art.</li>
+        <li><a href="https://support.snipd.com/en/articles/10226077-sync-your-snips-to-readwise">Snipd Readwise integration</a> - podcast highlights syncing into Readwise.</li>
+      </ul>
+    </section>
+
+    <footer class="composition-signal">Composed 2026-07-03T13:04Z by ce-ideate from the user's Apple Podcasts to Reader workflow prompt.</footer>
+  </main>
+</body>
+</html>

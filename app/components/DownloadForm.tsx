@@ -40,51 +40,54 @@ export default function DownloadForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (url && url.startsWith('https://podcasts.apple.com/')) {
-      track('episode_transcribe', { url: url })
-      setIsLoading(true)
-      setResult(null)
-      setTranscriptResult(null)
-      setMetadata(null)
+    if (!url || !url.startsWith('https://podcasts.apple.com/')) {
+      setResult({ error: "Please provide a valid Apple Podcasts episode URL" })
+      return
+    }
 
-      try {
-        const formData = new FormData()
-        formData.append('url', url)
+    track('episode_transcribe', { url: url })
+    setIsLoading(true)
+    setResult(null)
+    setTranscriptResult(null)
+    setMetadata(null)
 
-        // Fetch both in parallel
-        const [res, meta] = await Promise.all([
-          getDownloadUrl(formData),
-          getEpisodeMetadata(url)
-        ])
+    try {
+      const formData = new FormData()
+      formData.append('url', url)
 
-        setResult(res)
-        if (res.error) {
-          track('episode_transcribe_error', { step: 'download_url', error: res.error })
-        }
-        if (meta && 'error' in meta && meta.error) {
-          track('episode_transcribe_error', { step: 'metadata', error: meta.error })
-        } else {
-          setMetadata(meta)
-        }
+      // Fetch both in parallel
+      const [res, meta] = await Promise.all([
+        getDownloadUrl(formData),
+        getEpisodeMetadata(url)
+      ])
 
-        if (!res.error && res.downloadUrl) {
-          // Automatically start transcription
-          setIsTranscribing(true)
-          const transcriptRes = await getTranscript(res.downloadUrl)
-          setTranscriptResult(transcriptRes)
-          setIsTranscribing(false)
-          if (transcriptRes.error) {
-            track('episode_transcribe_error', { step: 'transcript', error: transcriptRes.error })
-          } else if (transcriptRes.transcript) {
-            track('episode_transcribe_success', { url: url })
-          }
-        }
-      } catch (error) {
-        console.error("Error during submission:", error)
-        track('episode_transcribe_error', { step: 'api', error: (error as Error).message })
-      } finally {
-        setIsLoading(false)
+      setResult(res)
+      if (res.error) {
+        track('episode_transcribe_error', { step: 'download_url', error: res.error })
       }
+      if (meta && 'error' in meta && meta.error) {
+        track('episode_transcribe_error', { step: 'metadata', error: meta.error })
+      } else {
+        setMetadata(meta)
+      }
+
+      if (!res.error && res.downloadUrl) {
+        // Automatically start transcription
+        setIsTranscribing(true)
+        const transcriptRes = await getTranscript(res.downloadUrl)
+        setTranscriptResult(transcriptRes)
+        setIsTranscribing(false)
+        if (transcriptRes.error) {
+          track('episode_transcribe_error', { step: 'transcript', error: transcriptRes.error })
+        } else if (transcriptRes.transcript) {
+          track('episode_transcribe_success', { url: url })
+        }
+      }
+    } catch (error) {
+      console.error("Error during submission:", error)
+      track('episode_transcribe_error', { step: 'api', error: (error as Error).message })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -190,6 +193,9 @@ export default function DownloadForm() {
                 />
                 <Button type="submit" disabled={isLoading}>Transcribe</Button>
               </form>
+              {result?.error && (
+                <p className="mt-3 text-sm text-red-600">{result.error}</p>
+              )}
             </CardContent>
           </>
         ) : (

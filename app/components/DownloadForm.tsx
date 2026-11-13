@@ -21,6 +21,7 @@ export default function DownloadForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [url, setUrl] = useState("")
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
   const [accessToken, setAccessToken] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -46,6 +47,7 @@ export default function DownloadForm() {
       setResult(null)
       setTranscriptResult(null)
       setMetadata(null)
+      setSubmitError(null)
 
       try {
         const formData = new FormData()
@@ -61,8 +63,14 @@ export default function DownloadForm() {
         if (res.error) {
           track('episode_transcribe_error', { step: 'download_url', error: res.error })
         }
+        if (res.error) {
+          setSubmitError(res.error)
+        }
         if (meta && 'error' in meta && meta.error) {
           track('episode_transcribe_error', { step: 'metadata', error: meta.error })
+          if (!res.error) {
+            setSubmitError(meta.error)
+          }
         } else {
           setMetadata(meta)
         }
@@ -74,6 +82,7 @@ export default function DownloadForm() {
           setTranscriptResult(transcriptRes)
           setIsTranscribing(false)
           if (transcriptRes.error) {
+            setSubmitError(transcriptRes.error)
             track('episode_transcribe_error', { step: 'transcript', error: transcriptRes.error })
           } else if (transcriptRes.transcript) {
             track('episode_transcribe_success', { url: url })
@@ -82,8 +91,10 @@ export default function DownloadForm() {
       } catch (error) {
         console.error("Error during submission:", error)
         track('episode_transcribe_error', { step: 'api', error: (error as Error).message })
+        setSubmitError("Something went wrong while transcribing this episode. Please try again.")
       } finally {
         setIsLoading(false)
+        setIsTranscribing(false)
       }
     }
   }
@@ -190,12 +201,15 @@ export default function DownloadForm() {
                 />
                 <Button type="submit" disabled={isLoading}>Transcribe</Button>
               </form>
+              {submitError && (
+                <p className="mt-4 text-sm text-red-600" role="alert">{submitError}</p>
+              )}
             </CardContent>
           </>
         ) : (
           <>
             {result?.error ? (
-              <p className="text-red-600">{result.error}</p>
+              <p className="p-6 text-red-600" role="alert">{result.error}</p>
             ) : (
               <>
                 <CardHeader>
@@ -245,6 +259,10 @@ export default function DownloadForm() {
                     <>
                       <p className="text-sm text-muted-foreground animate-pulse">Transcribing episode…</p>
                     </>
+                  )}
+
+                  {transcriptResult?.error && (
+                    <p className="text-sm text-red-600" role="alert">{transcriptResult.error}</p>
                   )}
 
                   {transcriptResult?.transcript && (

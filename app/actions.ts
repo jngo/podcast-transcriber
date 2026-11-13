@@ -21,11 +21,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 type ShareItemWithStreamUrl = {
   model?: {
     playAction?: {
-      episodeOffer?: {
-        streamUrl?: string
+      episodeOffer?: unknown
+    }
+  }
+}
+
+function isHttpUrl(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith("http")
+}
+
+// Video episodes are served as HLS playlists, which the transcription API cannot ingest.
+function isHlsUrl(url: string): boolean {
+  return /\.m3u8(\?|#|$)/i.test(url)
+}
+
+// For episodes that also have video, Apple sets `episodeOffer.streamUrl` to the HLS video
+// playlist and lists the plain audio file alongside it in `mediaEnclosures`. Prefer the
+// audio file, and only fall back to an HLS URL when nothing else is offered.
+function pickStreamUrlFromEpisodeOffer(offer: unknown): string | null {
+  if (!isRecord(offer)) {
+    return null
+  }
+
+  const urls: string[] = []
+  if (isHttpUrl(offer.streamUrl)) {
+    urls.push(offer.streamUrl)
+  }
+  if (Array.isArray(offer.mediaEnclosures)) {
+    for (const enclosure of offer.mediaEnclosures) {
+      if (isRecord(enclosure) && isHttpUrl(enclosure.streamUrl)) {
+        urls.push(enclosure.streamUrl)
       }
     }
   }
+
+  return urls.find((url) => !isHlsUrl(url)) ?? urls[0] ?? null
 }
 
 type StreamUrlCandidate = {
@@ -86,8 +116,10 @@ function findShareItemStreamUrl(node: unknown): string | null {
     const record = current as Record<string, unknown>
     const isShareItem = record.$kind === "share" && record.modelType === "EpisodeLockup"
     if (isShareItem) {
-      const streamUrl = (record as ShareItemWithStreamUrl).model?.playAction?.episodeOffer?.streamUrl
-      if (typeof streamUrl === "string" && streamUrl.startsWith("http")) {
+      const streamUrl = pickStreamUrlFromEpisodeOffer(
+        (record as ShareItemWithStreamUrl).model?.playAction?.episodeOffer,
+      )
+      if (streamUrl) {
         return streamUrl
       }
     }
@@ -127,8 +159,10 @@ function findHeaderButtonItemsStreamUrl(pageDataCandidates: Record<string, unkno
       continue
     }
 
-    const streamUrl = (shareItem as ShareItemWithStreamUrl).model?.playAction?.episodeOffer?.streamUrl
-    if (typeof streamUrl === "string" && streamUrl.startsWith("http")) {
+    const streamUrl = pickStreamUrlFromEpisodeOffer(
+      (shareItem as ShareItemWithStreamUrl).model?.playAction?.episodeOffer,
+    )
+    if (streamUrl) {
       return streamUrl
     }
   }
@@ -147,6 +181,7 @@ function scoreStreamUrlCandidate(url: string, path: string): number {
   if (normalizedPath.includes("primarybuttonaction")) score += 25
   if (/\.(mp3|m4a|aac|ogg)(\?|$)/i.test(url)) score += 35
   if (url.startsWith("https://")) score += 10
+  if (isHlsUrl(url)) score -= 500
 
   return score
 }
@@ -399,7 +434,9 @@ export async function getSummary(transcript: string) {
 }
 
 export async function getEpisodeMetadata(url: string) {
-  function formatDuration(isoDuration: string) {
+  function formatDuration(isoDuration: unknown) {
+    if (typeof isoDuration !== "string") return undefined;
+
     const matches = isoDuration.match(/P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/);
     if (!matches) return isoDuration;
 
@@ -424,7 +461,17 @@ export async function getEpisodeMetadata(url: string) {
       return { error: "Could not find episode metadata in the page" }
     }
 
-    const fullMetadata = JSON.parse(scriptContent)
+    // Episodes that also have video carry an array here: the PodcastEpisode
+    // entry followed by a VideoObject one. Audio-only episodes carry a single object.
+    const parsedMetadata: unknown = JSON.parse(scriptContent)
+    const metadataEntries = Array.isArray(parsedMetadata) ? parsedMetadata : [parsedMetadata]
+    const fullMetadata =
+      metadataEntries.find((entry) => isRecord(entry) && entry["@type"] === "PodcastEpisode") ??
+      metadataEntries.find(isRecord)
+
+    if (!fullMetadata) {
+      return { error: "Could not find episode metadata in the page" }
+    }
 
     return {
       productionCompany: fullMetadata.productionCompany,

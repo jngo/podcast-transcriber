@@ -20,6 +20,27 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Capture from the share sheet
+
+`POST /api/capture` does the whole flow in one request: it takes an Apple Podcasts episode URL, transcribes it and saves the transcript to Readwise Reader. It is meant to be called from an iOS Shortcut so an episode can be captured from the Podcasts app without opening the website.
+
+```bash
+curl -X POST https://<your-deployment>/api/capture \
+  -H "Authorization: Bearer <Readwise access token>" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://podcasts.apple.com/..."}'
+```
+
+A successful response is `{ "title": "...", "documentUrl": "https://read.readwise.io/..." }`. Failures return `{ "error": "..." }` with a 4xx or 5xx status.
+
+To set up the Shortcut:
+
+1. In the Shortcuts app, create a shortcut named "Capture episode". In its details, turn on **Show in Share Sheet** and limit the accepted input to **URLs**.
+2. Add **Get Contents of URL** with the URL `https://<your-deployment>/api/capture`, method **POST**, a header `Authorization` set to `Bearer <Readwise access token>`, and a JSON request body with one text field `url` set to **Shortcut Input**.
+3. Add **Get Dictionary Value** for the key `documentUrl`, then **Open URLs** (or **Show Notification** if you would rather keep listening).
+
+Then, in Apple Podcasts, share an episode and choose "Capture episode".
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
